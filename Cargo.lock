@@ -2864,7 +2864,7 @@ dependencies = [
 [[package]]
 name = "spel-framework"
 version = "0.5.0"
-source = "git+https://github.com/mmlado/spel.git?branch=main#73fc462eb8f0a4d00f1a846437c627ec2e523f83"
+source = "git+https://github.com/mmlado/spel.git?branch=feat%2Fwrap_instructions_m2#5f3dc81cb8226005bddbc99e3591817a0798f861"
 dependencies = [
  "borsh",
  "nssa_core",
@@ -2876,7 +2876,7 @@ dependencies = [
 [[package]]
 name = "spel-framework-core"
 version = "0.5.0"
-source = "git+https://github.com/mmlado/spel.git?branch=main#73fc462eb8f0a4d00f1a846437c627ec2e523f83"
+source = "git+https://github.com/mmlado/spel.git?branch=feat%2Fwrap_instructions_m2#5f3dc81cb8226005bddbc99e3591817a0798f861"
 dependencies = [
  "base58",
  "borsh",
@@ -2893,7 +2893,7 @@ dependencies = [
 [[package]]
 name = "spel-framework-macros"
 version = "0.5.0"
-source = "git+https://github.com/mmlado/spel.git?branch=main#73fc462eb8f0a4d00f1a846437c627ec2e523f83"
+source = "git+https://github.com/mmlado/spel.git?branch=feat%2Fwrap_instructions_m2#5f3dc81cb8226005bddbc99e3591817a0798f861"
 dependencies = [
  "proc-macro2",
  "quote",
