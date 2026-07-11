@@ -25,8 +25,9 @@ pub enum AuthorityError {
     /// [`AuthoritySlot::initialize`] was called with the renounced
     /// sentinel (`AccountId::default()`).
     InvalidCandidate,
-    /// A `Pda` candidate derives to an account with empty data. Setting
-    /// an undeployed PDA as the authority would brick the slot.
+    /// A `Pda` candidate derives to an account that is in default
+    /// (unclaimed) state on-chain. Setting an unclaimed PDA as the
+    /// authority would brick the slot.
     UndeployedPda,
     /// A `Pda` candidate does not derive to the address of the
     /// supplied account. Wrong account attached to the claim.
@@ -67,7 +68,8 @@ pub enum AuthorityCandidate {
     Signer,
     /// The candidate is a PDA. Validation re-derives the address from
     /// `(program_id, seed)` and confirms the supplied account matches
-    /// AND has non-empty data (i.e. the PDA is deployed).
+    /// AND is not in default (unclaimed) state — i.e. the PDA has been
+    /// claimed on-chain.
     Pda {
         /// Program that owns the PDA. Part of the address derivation.
         program_id: ProgramId,
@@ -88,8 +90,8 @@ impl AuthorityCandidate {
     /// - `AuthorityError::CandidateMismatch` if a `Pda` claim does not derive
     ///   to `account.account_id` (wrong account attached to the claim).
     /// - `AuthorityError::UndeployedPda` if the `Pda` derives correctly but
-    ///   the account has empty data (setting an undeployed PDA would brick
-    ///   the slot).
+    ///   the account is in default (unclaimed) state on-chain (setting an
+    ///   unclaimed PDA would brick the slot).
     pub fn validate(&self, account: &AccountWithMetadata) -> Result<AccountId, AuthorityError> {
         match self {
             AuthorityCandidate::Signer => {
@@ -174,13 +176,21 @@ impl AuthoritySlot {
         self.holder == AccountId::default()
     }
 
-    /// Installs `next` as the new holder without any auth check.
+    /// Installs `next` as the new holder without any auth check on the
+    /// caller.
     ///
     /// Enforcing "who is allowed to transfer" is the caller's job
     /// (downstream config types layer their own policy on top). This
-    /// primitive is a pure state mutator.
-    pub fn transfer_to(&mut self, next: AccountId) {
+    /// primitive still validates the incoming holder: `AccountId::default()`
+    /// is rejected with `AuthorityError::InvalidCandidate` because that
+    /// value is the renounced sentinel. To vacate the slot, use
+    /// [`renounce`](Self::renounce) instead.
+    pub fn transfer_to(&mut self, next: AccountId) -> Result<(), AuthorityError> {
+        if next == AccountId::default() {
+            return Err(AuthorityError::InvalidCandidate);
+        }
         self.holder = next;
+        Ok(())
     }
 
     /// Vacates the slot by writing the renounced sentinel.
@@ -260,7 +270,7 @@ mod tests {
     }
 
     #[test]
-    fn authority_candidate_reject_not_deployed_pda() {
+    fn authority_candidate_rejects_not_deployed_pda() {
         let program_id: ProgramId = [1; 8];
         let seed = [1; 32];
         let derived = AccountId::for_public_pda(&program_id, &PdaSeed::new(seed));
@@ -328,13 +338,19 @@ mod tests {
     }
 
     #[test]
-    fn authority_slot_transfer_to() {
+    fn authority_slot_transfer_to_accepts_valid_account_id() {
         let account_id = AccountId::new([1; 32]);
         let next_account_id = AccountId::new([2; 32]);
         let mut slot = AuthoritySlot { holder: account_id };
         assert_eq!(slot.holder, account_id);
-        slot.transfer_to(next_account_id);
+        assert_eq!(slot.transfer_to(next_account_id), Ok(()));
         assert_eq!(slot.holder, next_account_id);
+    }
+
+    #[test]
+    fn authority_slot_transfer_to_rejects_default_account_id() {
+        let mut slot = AuthoritySlot { holder: AccountId::new([1; 32]) };
+        assert_eq!(slot.transfer_to(AccountId::default()).unwrap_err(), AuthorityError::InvalidCandidate);
     }
 
     #[test]
@@ -354,7 +370,7 @@ mod tests {
         let next_account_id = AccountId::new([2; 32]);
         let mut slot = AuthoritySlot::initialize(account_id).unwrap();
         assert_eq!(slot.holder, account_id);
-        slot.transfer_to(next_account_id);
+        slot.transfer_to(next_account_id).unwrap();
         assert_eq!(slot.holder, next_account_id);
         slot.renounce();
         assert_eq!(slot.holder, AccountId::default());
