@@ -86,31 +86,41 @@ impl AuthorityCandidate {
     /// Both must agree before the address is trusted.
     ///
     /// Returns:
-    /// - `AuthorityError::InvalidCandidate` if `Signer` did not co-sign the tx.
+    /// - `AuthorityError::InvalidCandidate` if `Signer` did not co-sign the
+    ///   tx, or the resolved id is the default `AccountId` (the renounced
+    ///   sentinel; installing it would be a silent renounce).
     /// - `AuthorityError::CandidateMismatch` if a `Pda` claim does not derive
     ///   to `account.account_id` (wrong account attached to the claim).
     /// - `AuthorityError::UndeployedPda` if the `Pda` derives correctly but
-    ///   the account is in default (unclaimed) state on-chain (setting an
-    ///   unclaimed PDA would brick the slot).
+    ///   no program owns the account (`program_owner` is the default
+    ///   `ProgramId`). Anyone can fund the derived address; only the owning
+    ///   program's claim stamps `program_owner`, so a funded-but-unclaimed
+    ///   account is not a real PDA and would brick the slot.
     pub fn validate(&self, account: &AccountWithMetadata) -> Result<AccountId, AuthorityError> {
-        match self {
+        let resolved = match self {
             AuthorityCandidate::Signer => {
                 if !account.is_authorized {
                     return Err(AuthorityError::InvalidCandidate);
                 }
-                Ok(account.account_id)
+                account.account_id
             }
             AuthorityCandidate::Pda { program_id, seed } => {
                 let expected = AccountId::for_public_pda(program_id, &PdaSeed::new(*seed));
                 if account.account_id != expected {
                     return Err(AuthorityError::CandidateMismatch);
                 }
-                if account.account == Account::default() {
+                if account.account == Account::default()
+                    || account.account.program_owner == ProgramId::default()
+                {
                     return Err(AuthorityError::UndeployedPda);
                 }
-                Ok(account.account_id)
+                account.account_id
             }
+        };
+        if resolved == AccountId::default() {
+            return Err(AuthorityError::InvalidCandidate);
         }
+        Ok(resolved)
     }
 }
 
@@ -241,6 +251,7 @@ mod tests {
         let account = &AccountWithMetadata {
             account: Account {
                 data: vec![1].try_into().unwrap(),
+                program_owner: program_id,
                 ..Account::default()
             },
             is_authorized: false,
@@ -375,4 +386,38 @@ mod tests {
         slot.renounce();
         assert_eq!(slot.holder, AccountId::default());
     }
+
+    #[test]
+    fn authority_candidate_rejects_funded_but_unclaimed_pda() {
+        let program_id: ProgramId = [1; 8];
+        let seed = [1; 32];
+        let derived = AccountId::for_public_pda(&program_id, &PdaSeed::new(seed));
+        let account = &AccountWithMetadata {
+            account: Account {
+                data: vec![1].try_into().unwrap(),
+                ..Account::default()
+            },
+            is_authorized: false,
+            account_id: derived,
+        };
+        let candidate = AuthorityCandidate::Pda { program_id, seed };
+        assert_eq!(
+            candidate.validate(account),
+            Err(AuthorityError::UndeployedPda)
+        );
+    }
+
+    #[test]
+    fn authority_candidate_rejects_default_resolved_signer() {
+        let account = AccountWithMetadata {
+            account: Account::default(),
+            is_authorized: true,
+            account_id: AccountId::default(),
+        };
+        assert_eq!(
+            AuthorityCandidate::Signer.validate(&account),
+            Err(AuthorityError::InvalidCandidate)
+        );
+    }
+
 }
