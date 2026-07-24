@@ -40,6 +40,10 @@ pub enum AuthorityError {
     Renounced,
     /// The signer's `is_authorized` flag is false.
     MissingSignature,
+    /// An embedded-slot window `[offset..offset+32)` does not fit inside
+    /// the account's data. Layout error: the declared offset and the
+    /// account's actual size disagree.
+    SlotOutOfBounds,
 }
 
 impl core::fmt::Display for AuthorityError {
@@ -51,6 +55,7 @@ impl core::fmt::Display for AuthorityError {
             AuthorityError::InvalidCandidate => write!(f, "invalid authority candidate"),
             AuthorityError::UndeployedPda => write!(f, "candidate PDA is not deployed"),
             AuthorityError::CandidateMismatch => write!(f, "candidate address mismatch"),
+            AuthorityError::SlotOutOfBounds => write!(f, "embedded slot window out of bounds"),
         }
     }
 }
@@ -141,6 +146,10 @@ pub struct AuthoritySlot {
 }
 
 impl AuthoritySlot {
+    /// Borsh-encoded size of the slot. The single source of truth for the
+    /// embedded window width; `encoded_len_matches_borsh` pins it to the
+    /// actual encoding.
+    pub const ENCODED_LEN: usize = 32;
     /// Builds a slot with the given initial holder.
     ///
     /// Rejects `AccountId::default()` because that's the renounced
@@ -184,6 +193,39 @@ impl AuthoritySlot {
     /// (`AccountId::default()`), i.e. `assert` will always fail.
     pub fn is_renounced(&self) -> bool {
         self.holder == AccountId::default()
+    }
+
+    /// Reads the slot from the 32-byte window at `offset` in `data`.
+    ///
+    /// Used when the slot is embedded inside a larger account instead of
+    /// occupying a dedicated PDA's whole data. Returns
+    /// `AuthorityError::SlotOutOfBounds` when `data` is too short for the
+    /// window. The primitive knows nothing about states: config types run
+    /// their empty-data check first, so this error only ever means a
+    /// non-empty layout that disagrees with the declared offset.
+    pub fn read_at(data: &[u8], offset: usize) -> Result<Self, AuthorityError> {
+        let window = offset
+            .checked_add(Self::ENCODED_LEN)
+            .and_then(|end| data.get(offset..end))
+            .ok_or(AuthorityError::SlotOutOfBounds)?;
+        // The bounds check guarantees an ENCODED_LEN-byte window, so decoding a
+        // fixed ENCODED_LEN-byte slot cannot fail here.
+        Self::try_from_slice(window).map_err(|_| AuthorityError::SlotOutOfBounds)
+    }
+
+    /// Writes the slot into an ENCODED_LEN-byte window at `offset` in `data`,
+    /// leaving every byte outside the window untouched.
+    ///
+    /// Returns `AuthorityError::SlotOutOfBounds` when `data` is too short
+    /// for the window. On error `data` is not modified.
+    pub fn write_at(&self, data: &mut [u8], offset: usize) -> Result<(), AuthorityError> {
+        let window = offset
+            .checked_add(Self::ENCODED_LEN)
+            .and_then(|end| data.get_mut(offset..end))
+            .ok_or(AuthorityError::SlotOutOfBounds)?;
+        let bytes = borsh::to_vec(self).map_err(|_| AuthorityError::SlotOutOfBounds)?;
+        window.copy_from_slice(&bytes);
+        Ok(())
     }
 
     /// Installs `next` as the new holder without any auth check on the
@@ -360,8 +402,13 @@ mod tests {
 
     #[test]
     fn authority_slot_transfer_to_rejects_default_account_id() {
-        let mut slot = AuthoritySlot { holder: AccountId::new([1; 32]) };
-        assert_eq!(slot.transfer_to(AccountId::default()).unwrap_err(), AuthorityError::InvalidCandidate);
+        let mut slot = AuthoritySlot {
+            holder: AccountId::new([1; 32]),
+        };
+        assert_eq!(
+            slot.transfer_to(AccountId::default()).unwrap_err(),
+            AuthorityError::InvalidCandidate
+        );
     }
 
     #[test]
@@ -420,4 +467,84 @@ mod tests {
         );
     }
 
+    #[test]
+    fn read_at_reads_slot_at_nonzero_offset() {
+        let mut data = vec![0xAA; 72]; // sentinel neighbors
+        data[8..40].copy_from_slice(&[7; 32]); // slot window at 8
+        let slot = AuthoritySlot::read_at(&data, 8).unwrap();
+        assert_eq!(slot.holder(), AccountId::new([7; 32]));
+    }
+
+    #[test]
+    fn read_at_offset_zero_is_the_dedicated_case() {
+        let data = [9u8; 32];
+        let slot = AuthoritySlot::read_at(&data, 0).unwrap();
+        assert_eq!(slot.holder(), AccountId::new([9; 32]));
+    }
+
+    #[test]
+    fn read_at_too_short_data_is_out_of_bounds() {
+        let data = [0u8; 40];
+        assert_eq!(
+            AuthoritySlot::read_at(&data, 9),
+            Err(AuthorityError::SlotOutOfBounds)
+        );
+    }
+
+    #[test]
+    fn read_at_huge_offset_does_not_overflow() {
+        let data = [0u8; 32];
+        assert_eq!(
+            AuthoritySlot::read_at(&data, usize::MAX),
+            Err(AuthorityError::SlotOutOfBounds)
+        );
+    }
+
+    #[test]
+    fn write_at_splices_only_the_window() {
+        let mut data = vec![0xAA; 72];
+        let slot = AuthoritySlot::initialize(AccountId::new([5; 32])).unwrap();
+        slot.write_at(&mut data, 8).unwrap();
+        assert!(data[..8].iter().all(|b| *b == 0xAA), "prefix trampled");
+        assert!(data[40..].iter().all(|b| *b == 0xAA), "suffix trampled");
+        assert_eq!(&data[8..40], &[5; 32]);
+    }
+
+    #[test]
+    fn write_at_out_of_bounds_leaves_data_untouched() {
+        let mut data = vec![0xAA; 30];
+        let slot = AuthoritySlot::initialize(AccountId::new([5; 32])).unwrap();
+        assert_eq!(
+            slot.write_at(&mut data, 0),
+            Err(AuthorityError::SlotOutOfBounds)
+        );
+        assert!(data.iter().all(|b| *b == 0xAA));
+    }
+
+    #[test]
+    fn read_write_roundtrip_at_unaligned_offset() {
+        let mut data = vec![0u8; 64];
+        let slot = AuthoritySlot::initialize(AccountId::new([3; 32])).unwrap();
+        slot.write_at(&mut data, 7).unwrap();
+        assert_eq!(AuthoritySlot::read_at(&data, 7).unwrap(), slot);
+    }
+
+    #[test]
+    fn renounced_slot_writes_zeros_into_window() {
+        let mut data = vec![0xFF; 40];
+        let mut slot = AuthoritySlot::initialize(AccountId::new([4; 32])).unwrap();
+        slot.renounce();
+        slot.write_at(&mut data, 4).unwrap();
+        assert_eq!(&data[4..36], &[0u8; 32]);
+        assert!(AuthoritySlot::read_at(&data, 4).unwrap().is_renounced());
+    }
+
+    #[test]
+    fn encoded_len_matches_borsh() {
+        let slot = AuthoritySlot::initialize(AccountId::new([1; 32])).unwrap();
+        assert_eq!(
+            borsh::to_vec(&slot).unwrap().len(),
+            AuthoritySlot::ENCODED_LEN
+        );
+    }
 }
