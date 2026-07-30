@@ -37,3 +37,7 @@ impl AdminConfig {
 ```
 
 `AuthoritySlot` itself never decides who may call `transfer` — that check (`self.slot.assert(current)`) is the consuming library's job.
+
+## License
+
+Dual-licensed under [MIT](LICENSE-MIT) and [Apache 2.0](LICENSE-APACHE2) at the consumer's option.
