@@ -22,9 +22,9 @@ checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
 name = "android_system_properties"
-version = "0.1.5"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "819e7219dbd41043ac279b19830f2efc897156490d7fd6ea916720117ee66311"
+checksum = "ae221649c9976a6f6c56ae1facf410f3ddb33cc661c4b7b61020a912d4237fbc"
 dependencies = [
  "libc",
 ]
@@ -1006,9 +1006,9 @@ dependencies = [
 
 [[package]]
 name = "keccak"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e24a010dd405bd7ed803e5253182815b41bf2e6a80cc3bfc066658e03a198aa"
+checksum = "ffd9697dc4a9a62e2da93389f34400b77a28f0287711263cabb203b3ccb9c0e4"
 dependencies = [
  "cfg-if",
  "cpufeatures 0.3.0",
@@ -1765,7 +1765,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be176f1a57ce4e3d31c1a166222d9768de5954f811601fb7ca06fc8203905ce1"
 dependencies = [
  "digest 0.11.3",
- "keccak 0.2.0",
+ "keccak 0.2.1",
 ]
 
 [[package]]
@@ -1792,7 +1792,7 @@ dependencies = [
 [[package]]
 name = "spel-framework"
 version = "0.5.0"
-source = "git+https://github.com/mmlado/spel.git?rev=56ea137d8203da9b860839de41fa4f965a21dec5#56ea137d8203da9b860839de41fa4f965a21dec5"
+source = "git+https://github.com/mmlado/spel.git?rev=98752095f45d405469f572668cd744c317fb8dad#98752095f45d405469f572668cd744c317fb8dad"
 dependencies = [
  "borsh",
  "lee_core",
@@ -1804,7 +1804,7 @@ dependencies = [
 [[package]]
 name = "spel-framework-core"
 version = "0.5.0"
-source = "git+https://github.com/mmlado/spel.git?rev=56ea137d8203da9b860839de41fa4f965a21dec5#56ea137d8203da9b860839de41fa4f965a21dec5"
+source = "git+https://github.com/mmlado/spel.git?rev=98752095f45d405469f572668cd744c317fb8dad#98752095f45d405469f572668cd744c317fb8dad"
 dependencies = [
  "base58",
  "borsh",
@@ -1821,7 +1821,7 @@ dependencies = [
 [[package]]
 name = "spel-framework-macros"
 version = "0.5.0"
-source = "git+https://github.com/mmlado/spel.git?rev=56ea137d8203da9b860839de41fa4f965a21dec5#56ea137d8203da9b860839de41fa4f965a21dec5"
+source = "git+https://github.com/mmlado/spel.git?rev=98752095f45d405469f572668cd744c317fb8dad#98752095f45d405469f572668cd744c317fb8dad"
 dependencies = [
  "proc-macro2",
  "quote",
