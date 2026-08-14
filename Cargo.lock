@@ -1792,7 +1792,7 @@ dependencies = [
 [[package]]
 name = "spel-framework"
 version = "0.5.0"
-source = "git+https://github.com/mmlado/spel.git?branch=feat%2Fderived_embedding#87a5190eb1baddd2e320b53322728debdbba5303"
+source = "git+https://github.com/mmlado/spel.git?rev=7b954dbb572f611fbe5ebaa00b75aaa029803e3b#7b954dbb572f611fbe5ebaa00b75aaa029803e3b"
 dependencies = [
  "borsh",
  "lee_core",
@@ -1804,7 +1804,7 @@ dependencies = [
 [[package]]
 name = "spel-framework-core"
 version = "0.5.0"
-source = "git+https://github.com/mmlado/spel.git?branch=feat%2Fderived_embedding#87a5190eb1baddd2e320b53322728debdbba5303"
+source = "git+https://github.com/mmlado/spel.git?rev=7b954dbb572f611fbe5ebaa00b75aaa029803e3b#7b954dbb572f611fbe5ebaa00b75aaa029803e3b"
 dependencies = [
  "base58",
  "borsh",
@@ -1821,7 +1821,7 @@ dependencies = [
 [[package]]
 name = "spel-framework-macros"
 version = "0.5.0"
-source = "git+https://github.com/mmlado/spel.git?branch=feat%2Fderived_embedding#87a5190eb1baddd2e320b53322728debdbba5303"
+source = "git+https://github.com/mmlado/spel.git?rev=7b954dbb572f611fbe5ebaa00b75aaa029803e3b#7b954dbb572f611fbe5ebaa00b75aaa029803e3b"
 dependencies = [
  "proc-macro2",
  "quote",
