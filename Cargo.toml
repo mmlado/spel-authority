@@ -7,4 +7,4 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 borsh = { version = "1", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
-spel-framework = { git = "https://github.com/mmlado/spel.git", rev = "a1b3163142f97a8879ae209a8e16ac054f5c99f9" }
+spel-framework = { git = "https://github.com/mmlado/spel.git", rev = "bbd887728d6c00accccbade5941256e8a43af6b6" }
