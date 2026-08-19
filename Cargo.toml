@@ -2,7 +2,11 @@
 name = "spel-authority"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
 license = "MIT OR Apache-2.0"
+description = "Policy-free single-holder authority slot primitives for SPEL libraries"
+repository = "https://github.com/mmlado/spel-authority"
+readme = "README.md"
 
 [dependencies]
 borsh = { version = "1", features = ["derive"] }
