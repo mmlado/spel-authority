@@ -1,0 +1,10 @@
+# cargo-audit policy. Every ignored advisory arrives through the
+# risc0/arkworks stack inside the pinned LEZ lee_core dependency and is
+# not selectable from this crate. Tracked upstream, revisit on every
+# LEZ pin bump.
+[advisories]
+ignore = [
+    "RUSTSEC-2025-0055", # tracing-subscriber 0.2 ANSI log poisoning, via ark-relations -> risc0-zkvm -> lee_core
+    "RUSTSEC-2024-0388", # derivative unmaintained, arkworks provenance
+    "RUSTSEC-2024-0436", # paste unmaintained, arkworks provenance
+]
