@@ -1791,8 +1791,8 @@ dependencies = [
 
 [[package]]
 name = "spel-framework"
-version = "0.6.0"
-source = "git+https://github.com/mmlado/spel.git?rev=f7aa464b2c6c72ef513a25ede16584bca85b722f#f7aa464b2c6c72ef513a25ede16584bca85b722f"
+version = "0.5.0"
+source = "git+https://github.com/mmlado/spel.git?rev=bbd887728d6c00accccbade5941256e8a43af6b6#bbd887728d6c00accccbade5941256e8a43af6b6"
 dependencies = [
  "borsh",
  "lee_core",
@@ -1803,8 +1803,8 @@ dependencies = [
 
 [[package]]
 name = "spel-framework-core"
-version = "0.6.0"
-source = "git+https://github.com/mmlado/spel.git?rev=f7aa464b2c6c72ef513a25ede16584bca85b722f#f7aa464b2c6c72ef513a25ede16584bca85b722f"
+version = "0.5.0"
+source = "git+https://github.com/mmlado/spel.git?rev=bbd887728d6c00accccbade5941256e8a43af6b6#bbd887728d6c00accccbade5941256e8a43af6b6"
 dependencies = [
  "base58",
  "borsh",
@@ -1820,8 +1820,8 @@ dependencies = [
 
 [[package]]
 name = "spel-framework-macros"
-version = "0.6.0"
-source = "git+https://github.com/mmlado/spel.git?rev=f7aa464b2c6c72ef513a25ede16584bca85b722f#f7aa464b2c6c72ef513a25ede16584bca85b722f"
+version = "0.5.0"
+source = "git+https://github.com/mmlado/spel.git?rev=bbd887728d6c00accccbade5941256e8a43af6b6#bbd887728d6c00accccbade5941256e8a43af6b6"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2281,18 +2281,18 @@ checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
 
 [[package]]
 name = "zerocopy"
-version = "0.8.55"
+version = "0.8.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5a105cd7b140f6eeec8acff2ea38135d3cab283ada58540f629fe51e46696eb"
+checksum = "556764e583adb45a9f8d413c2a147fa7e8d821e48e12b14fd560b607998b75eb"
 dependencies = [
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.55"
+version = "0.8.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fe976fb70c78cd64cccfe3a6fc142244e8a77b70959b30faf9d0ac37ee228eb"
+checksum = "f2ab42fc20575779bd240faa45f94a74256f755c0fa9e89f0ede20d91d0cdfc1"
 dependencies = [
  "proc-macro2",
  "quote",
