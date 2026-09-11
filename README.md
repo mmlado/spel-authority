@@ -17,7 +17,7 @@ A downstream library wraps `AuthoritySlot` in its own named config type and laye
 
 ```toml
 [dependencies]
-authority = { git = "https://github.com/mmlado/spel-authority.git", tag = "v0.1.0", package = "spel-authority" }
+authority = { git = "https://github.com/mmlado/spel-authority.git", tag = "v0.1.1", package = "spel-authority" }
 ```
 
 ```rust
