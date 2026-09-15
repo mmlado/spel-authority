@@ -11,4 +11,4 @@ readme = "README.md"
 [dependencies]
 borsh = { version = "1", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
-spel-framework = { git = "https://github.com/logos-co/spel.git", rev = "8183b011b1a00dbc73ca9209f6b902c622d899af" }
+spel-framework = { git = "https://github.com/mmlado/spel.git", rev = "3d8307391b86786b7027e1fdd871ae6d37ccf321" }
