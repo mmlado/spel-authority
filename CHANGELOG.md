@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-09-17
+
+### Changed
+
+- Pin `spel-framework` to `logos-co/spel` at d0bb659, where the
+  framework's own `#[instruction]` strips `#[account(...)]` attrs when it
+  expands outside `#[lez_program]` (logos-co/spel#271). Libraries built on
+  this crate can re-export it instead of shipping a stripping shim.
+
 ## [0.1.1] - 2026-09-11
 
 ### Changed
@@ -36,6 +45,7 @@ First release.
   uninitialized slot.
 - Dual MIT/Apache-2.0 license and CI.
 
-[Unreleased]: https://github.com/mmlado/spel-authority/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/mmlado/spel-authority/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/mmlado/spel-authority/releases/tag/v0.1.2
 [0.1.1]: https://github.com/mmlado/spel-authority/releases/tag/v0.1.1
 [0.1.0]: https://github.com/mmlado/spel-authority/releases/tag/v0.1.0
