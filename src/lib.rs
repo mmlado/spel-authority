@@ -44,6 +44,11 @@ pub enum AuthorityError {
     /// the account's data. Layout error: the declared offset and the
     /// account's actual size disagree.
     SlotOutOfBounds,
+    /// A `Signer` candidate's account is owned by no program. LEZ v0.2.1
+    /// to v0.2.4 rejects such an account in every transaction after its
+    /// first, so installing it would strand the slot. Run
+    /// `wallet auth-transfer init` on the key first.
+    UnownedSigner,
 }
 
 impl core::fmt::Display for AuthorityError {
@@ -56,6 +61,7 @@ impl core::fmt::Display for AuthorityError {
             AuthorityError::UndeployedPda => write!(f, "candidate PDA is not deployed"),
             AuthorityError::CandidateMismatch => write!(f, "candidate address mismatch"),
             AuthorityError::SlotOutOfBounds => write!(f, "embedded slot window out of bounds"),
+            AuthorityError::UnownedSigner => write!(f, "candidate signer is owned by no program"),
         }
     }
 }
@@ -69,7 +75,8 @@ impl std::error::Error for AuthorityError {}
 #[derive(Deserialize, Serialize, BorshDeserialize, BorshSerialize, Debug, Clone, PartialEq, Eq)]
 pub enum AuthorityCandidate {
     /// The candidate is the tx signer. Validation checks that the
-    /// signer's account co-signed (`is_authorized == true`).
+    /// signer's account co-signed (`is_authorized == true`) and that some
+    /// program owns it.
     Signer,
     /// The candidate is a PDA. Validation re-derives the address from
     /// `(program_id, seed)` and confirms the supplied account matches
@@ -94,6 +101,8 @@ impl AuthorityCandidate {
     /// - `AuthorityError::InvalidCandidate` if `Signer` did not co-sign the
     ///   tx, or the resolved id is the default `AccountId` (the renounced
     ///   sentinel; installing it would be a silent renounce).
+    /// - `AuthorityError::UnownedSigner` if a `Signer`'s account is owned by
+    ///   no program.
     /// - `AuthorityError::CandidateMismatch` if a `Pda` claim does not derive
     ///   to `account.account_id` (wrong account attached to the claim).
     /// - `AuthorityError::UndeployedPda` if the `Pda` derives correctly but
@@ -106,6 +115,9 @@ impl AuthorityCandidate {
             AuthorityCandidate::Signer => {
                 if !account.is_authorized {
                     return Err(AuthorityError::InvalidCandidate);
+                }
+                if account.account.program_owner == ProgramId::default() {
+                    return Err(AuthorityError::UnownedSigner);
                 }
                 account.account_id
             }
@@ -267,12 +279,28 @@ mod tests {
         }
     }
 
+    // What `wallet auth-transfer init` leaves behind: a key some program owns.
+    fn owned_acct(id_byte: u8, signed: bool) -> AccountWithMetadata {
+        let mut account = acct(id_byte, signed);
+        account.account.program_owner = [5; 8];
+        account
+    }
+
     #[test]
     fn authority_candidate_accepts_signer() {
-        let account = acct(1, true);
+        let account = owned_acct(1, true);
         let candidate = AuthorityCandidate::Signer;
         let result = candidate.validate(&account);
         assert_eq!(result, Ok(account.account_id));
+    }
+
+    #[test]
+    fn authority_candidate_rejects_unowned_signer() {
+        let account = acct(1, true);
+        assert_eq!(
+            AuthorityCandidate::Signer.validate(&account),
+            Err(AuthorityError::UnownedSigner)
+        );
     }
 
     #[test]
@@ -456,11 +484,8 @@ mod tests {
 
     #[test]
     fn authority_candidate_rejects_default_resolved_signer() {
-        let account = AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::default(),
-        };
+        let mut account = owned_acct(0, true);
+        account.account_id = AccountId::default();
         assert_eq!(
             AuthorityCandidate::Signer.validate(&account),
             Err(AuthorityError::InvalidCandidate)
