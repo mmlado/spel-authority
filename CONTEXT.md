@@ -33,7 +33,7 @@ _Avoid_: adding any admin- or freeze-specific method here — that belongs in th
 
 ## Relationships
 
-- An **AuthoritySlot** holds at most one **holder** `AccountId`, or is renounced.
+- An **AuthoritySlot** holds at most one **holder** `AccountId`, or is renounced, and at most one **Nominee**. Any change of holder clears the Nominee.
 - An **AuthorityCandidate** is validated into a plain `AccountId` before it may become a slot's holder — the candidate is the claim, the paired `AccountWithMetadata` is the chain-state evidence.
 - Downstream libraries (`admin-authority`, `freeze-authority`) each embed exactly one **AuthoritySlot** inside their own config type and layer transfer/renounce authorization policy on top.
 
