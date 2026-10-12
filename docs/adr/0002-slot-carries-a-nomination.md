@@ -24,5 +24,5 @@ The primitives follow the existing split between mechanism and policy:
 ## Consequences
 
 - Supersedes "the slot primitive stays 32-byte and slot-only" in admin-authority's `CONTEXT.md` (embedded mode).
-- Breaking for every consumer: 0.2.0.
+- Breaking for every consumer.
 - Admin's terminal renounce still holds through policy: renounce clears `pending`, and only the admin may nominate, so nothing can accept afterwards.

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-12
+
 ### Added
 
 - `AuthoritySlot::nominate`, `accept` and `pending`.
@@ -14,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Pin `spel-framework` to tag `v0.7.0`.
 - Breaking: `AuthoritySlot` encodes as 64 bytes, holder at `0..32`, nominee at `32..64`. `ENCODED_LEN` is 64.
 - `transfer_to`, `accept` and `renounce` clear the nominee.
 - Breaking: `AuthorityCandidate::validate` refuses a `Signer` whose account no program owns.
@@ -56,7 +59,8 @@ First release.
   uninitialized slot.
 - Dual MIT/Apache-2.0 license and CI.
 
-[Unreleased]: https://github.com/mmlado/spel-authority/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/mmlado/spel-authority/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/mmlado/spel-authority/releases/tag/v0.2.0
 [0.1.2]: https://github.com/mmlado/spel-authority/releases/tag/v0.1.2
 [0.1.1]: https://github.com/mmlado/spel-authority/releases/tag/v0.1.1
 [0.1.0]: https://github.com/mmlado/spel-authority/releases/tag/v0.1.0
