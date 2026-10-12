@@ -49,6 +49,10 @@ pub enum AuthorityError {
     /// first, so installing it would strand the slot. Run
     /// `wallet auth-transfer init` on the key first.
     UnownedSigner,
+    /// `accept` was called on a slot with no nomination.
+    NoNomination,
+    /// The signer of `accept` is not the nominee.
+    NotNominee,
 }
 
 impl core::fmt::Display for AuthorityError {
@@ -62,6 +66,8 @@ impl core::fmt::Display for AuthorityError {
             AuthorityError::CandidateMismatch => write!(f, "candidate address mismatch"),
             AuthorityError::SlotOutOfBounds => write!(f, "embedded slot window out of bounds"),
             AuthorityError::UnownedSigner => write!(f, "candidate signer is owned by no program"),
+            AuthorityError::NoNomination => write!(f, "no nomination to accept"),
+            AuthorityError::NotNominee => write!(f, "signer is not the nominee"),
         }
     }
 }
@@ -141,27 +147,29 @@ impl AuthorityCandidate {
     }
 }
 
-/// A single authority slot storing one holder.
+/// A single authority slot storing one holder and at most one nominee.
 ///
 /// Lifecycle: [`initialize`](Self::initialize) sets a holder, then
-/// [`assert`](Self::assert) gates callers against that holder,
-/// [`transfer_to`](Self::transfer_to) hands it off, and
-/// [`renounce`](Self::renounce) vacates the slot.
+/// [`assert`](Self::assert) gates callers against that holder. The holder
+/// changes by [`transfer_to`](Self::transfer_to) in one step, or by
+/// [`nominate`](Self::nominate) followed by the nominee's
+/// [`accept`](Self::accept). [`renounce`](Self::renounce) vacates the slot.
 ///
-/// The renounced sentinel is `AccountId::default()`. A renounced slot
-/// rejects all `assert` calls until a downstream policy re-populates
-/// the holder via `transfer_to`.
+/// `AccountId::default()` is the sentinel in both fields: a renounced
+/// holder, and no nomination. Every change of holder clears the
+/// nomination (ADR-0002).
 #[account_type]
 #[derive(BorshDeserialize, BorshSerialize, Clone, Debug, PartialEq, Eq, Default)]
 pub struct AuthoritySlot {
     holder: AccountId,
+    pending: AccountId,
 }
 
 impl AuthoritySlot {
     /// Borsh-encoded size of the slot. The single source of truth for the
     /// embedded window width; `encoded_len_matches_borsh` pins it to the
     /// actual encoding.
-    pub const ENCODED_LEN: usize = 32;
+    pub const ENCODED_LEN: usize = 64;
     /// Builds a slot with the given initial holder.
     ///
     /// Rejects `AccountId::default()` because that's the renounced
@@ -170,7 +178,10 @@ impl AuthoritySlot {
         if holder == AccountId::default() {
             return Err(AuthorityError::InvalidCandidate);
         }
-        Ok(Self { holder })
+        Ok(Self {
+            holder,
+            pending: AccountId::default(),
+        })
     }
 
     /// Confirms the signer is the current holder.
@@ -207,7 +218,47 @@ impl AuthoritySlot {
         self.holder == AccountId::default()
     }
 
-    /// Reads the slot from the 32-byte window at `offset` in `data`.
+    /// Returns the nominee, or `None` when there is no nomination.
+    pub fn pending(&self) -> Option<AccountId> {
+        (self.pending != AccountId::default()).then_some(self.pending)
+    }
+
+    /// Names `next` as the nominee without any auth check on the caller,
+    /// replacing any earlier nomination. `AccountId::default()` cancels.
+    ///
+    /// Who may nominate is the consuming library's policy.
+    pub fn nominate(&mut self, next: AccountId) {
+        self.pending = next;
+    }
+
+    /// Installs the nominee as holder on the nominee's own signature and
+    /// clears the nomination.
+    ///
+    /// Does not look at `is_renounced`: whether a vacant slot may be filled
+    /// is the consuming library's policy.
+    ///
+    /// Returns:
+    /// - `AuthorityError::NoNomination` if there is no nominee.
+    /// - `AuthorityError::MissingSignature` if `signer.is_authorized` is false.
+    /// - `AuthorityError::NotNominee` if the signer is not the nominee.
+    /// - `AuthorityError::UnownedSigner` if no program owns the signer's account.
+    pub fn accept(&mut self, signer: &AccountWithMetadata) -> Result<(), AuthorityError> {
+        let nominee = self.pending().ok_or(AuthorityError::NoNomination)?;
+        if !signer.is_authorized {
+            return Err(AuthorityError::MissingSignature);
+        }
+        if signer.account_id != nominee {
+            return Err(AuthorityError::NotNominee);
+        }
+        if signer.account.program_owner == ProgramId::default() {
+            return Err(AuthorityError::UnownedSigner);
+        }
+        self.holder = nominee;
+        self.pending = AccountId::default();
+        Ok(())
+    }
+
+    /// Reads the slot from the `ENCODED_LEN`-byte window at `offset` in `data`.
     ///
     /// Used when the slot is embedded inside a larger account instead of
     /// occupying a dedicated PDA's whole data. Returns
@@ -254,16 +305,19 @@ impl AuthoritySlot {
             return Err(AuthorityError::InvalidCandidate);
         }
         self.holder = next;
+        self.pending = AccountId::default();
         Ok(())
     }
 
-    /// Vacates the slot by writing the renounced sentinel.
+    /// Vacates the slot by writing the renounced sentinel, and clears any
+    /// nomination.
     ///
     /// Not terminal at this layer. A downstream policy may re-populate
-    /// the slot via `transfer_to`. After renounce, `assert` always fails
-    /// with `AuthorityError::Renounced` until repopulated.
+    /// the slot via `transfer_to` or a nomination. After renounce, `assert`
+    /// always fails with `AuthorityError::Renounced` until repopulated.
     pub fn renounce(&mut self) {
         self.holder = AccountId::default();
+        self.pending = AccountId::default();
     }
 }
 
@@ -387,6 +441,7 @@ mod tests {
         let account = acct(1, true);
         let slot = AuthoritySlot {
             holder: account.account_id,
+            ..Default::default()
         };
         assert!(slot.assert(&account).is_ok());
     }
@@ -396,6 +451,7 @@ mod tests {
         let signer = acct(1, true);
         let slot = AuthoritySlot {
             holder: AccountId::default(),
+            ..Default::default()
         };
         assert_eq!(slot.assert(&signer), Err(AuthorityError::Renounced));
     }
@@ -405,6 +461,7 @@ mod tests {
         let signer = acct(1, false);
         let slot = AuthoritySlot {
             holder: signer.account_id,
+            ..Default::default()
         };
         assert_eq!(slot.assert(&signer), Err(AuthorityError::MissingSignature));
     }
@@ -414,6 +471,7 @@ mod tests {
         let signer = acct(1, true);
         let slot = AuthoritySlot {
             holder: AccountId::new([2; 32]),
+            ..Default::default()
         };
         assert_eq!(slot.assert(&signer), Err(AuthorityError::NotHolder));
     }
@@ -422,7 +480,10 @@ mod tests {
     fn authority_slot_transfer_to_accepts_valid_account_id() {
         let account_id = AccountId::new([1; 32]);
         let next_account_id = AccountId::new([2; 32]);
-        let mut slot = AuthoritySlot { holder: account_id };
+        let mut slot = AuthoritySlot {
+            holder: account_id,
+            ..Default::default()
+        };
         assert_eq!(slot.holder, account_id);
         assert_eq!(slot.transfer_to(next_account_id), Ok(()));
         assert_eq!(slot.holder, next_account_id);
@@ -432,6 +493,7 @@ mod tests {
     fn authority_slot_transfer_to_rejects_default_account_id() {
         let mut slot = AuthoritySlot {
             holder: AccountId::new([1; 32]),
+            ..Default::default()
         };
         assert_eq!(
             slot.transfer_to(AccountId::default()).unwrap_err(),
@@ -444,6 +506,7 @@ mod tests {
         let signer = acct(1, true);
         let mut slot = AuthoritySlot {
             holder: signer.account_id,
+            ..Default::default()
         };
         assert_eq!(slot.holder, signer.account_id);
         slot.renounce();
@@ -494,22 +557,24 @@ mod tests {
 
     #[test]
     fn read_at_reads_slot_at_nonzero_offset() {
-        let mut data = vec![0xAA; 72]; // sentinel neighbors
-        data[8..40].copy_from_slice(&[7; 32]); // slot window at 8
+        let mut data = vec![0xAA; 104]; // sentinel neighbors
+        data[8..40].copy_from_slice(&[7; 32]); // holder at 8
+        data[40..72].copy_from_slice(&[6; 32]); // nominee at 40
         let slot = AuthoritySlot::read_at(&data, 8).unwrap();
         assert_eq!(slot.holder(), AccountId::new([7; 32]));
+        assert_eq!(slot.pending(), Some(AccountId::new([6; 32])));
     }
 
     #[test]
     fn read_at_offset_zero_is_the_dedicated_case() {
-        let data = [9u8; 32];
+        let data = [9u8; 64];
         let slot = AuthoritySlot::read_at(&data, 0).unwrap();
         assert_eq!(slot.holder(), AccountId::new([9; 32]));
     }
 
     #[test]
     fn read_at_too_short_data_is_out_of_bounds() {
-        let data = [0u8; 40];
+        let data = [0u8; 72];
         assert_eq!(
             AuthoritySlot::read_at(&data, 9),
             Err(AuthorityError::SlotOutOfBounds)
@@ -527,17 +592,18 @@ mod tests {
 
     #[test]
     fn write_at_splices_only_the_window() {
-        let mut data = vec![0xAA; 72];
+        let mut data = vec![0xAA; 104];
         let slot = AuthoritySlot::initialize(AccountId::new([5; 32])).unwrap();
         slot.write_at(&mut data, 8).unwrap();
         assert!(data[..8].iter().all(|b| *b == 0xAA), "prefix trampled");
-        assert!(data[40..].iter().all(|b| *b == 0xAA), "suffix trampled");
+        assert!(data[72..].iter().all(|b| *b == 0xAA), "suffix trampled");
         assert_eq!(&data[8..40], &[5; 32]);
+        assert_eq!(&data[40..72], &[0; 32], "no nomination is the default id");
     }
 
     #[test]
     fn write_at_out_of_bounds_leaves_data_untouched() {
-        let mut data = vec![0xAA; 30];
+        let mut data = vec![0xAA; 62];
         let slot = AuthoritySlot::initialize(AccountId::new([5; 32])).unwrap();
         assert_eq!(
             slot.write_at(&mut data, 0),
@@ -548,19 +614,20 @@ mod tests {
 
     #[test]
     fn read_write_roundtrip_at_unaligned_offset() {
-        let mut data = vec![0u8; 64];
-        let slot = AuthoritySlot::initialize(AccountId::new([3; 32])).unwrap();
+        let mut data = vec![0u8; 96];
+        let mut slot = AuthoritySlot::initialize(AccountId::new([3; 32])).unwrap();
+        slot.nominate(AccountId::new([4; 32]));
         slot.write_at(&mut data, 7).unwrap();
         assert_eq!(AuthoritySlot::read_at(&data, 7).unwrap(), slot);
     }
 
     #[test]
     fn renounced_slot_writes_zeros_into_window() {
-        let mut data = vec![0xFF; 40];
+        let mut data = vec![0xFF; 72];
         let mut slot = AuthoritySlot::initialize(AccountId::new([4; 32])).unwrap();
         slot.renounce();
         slot.write_at(&mut data, 4).unwrap();
-        assert_eq!(&data[4..36], &[0u8; 32]);
+        assert_eq!(&data[4..68], &[0u8; 64]);
         assert!(AuthoritySlot::read_at(&data, 4).unwrap().is_renounced());
     }
 
@@ -571,5 +638,103 @@ mod tests {
             borsh::to_vec(&slot).unwrap().len(),
             AuthoritySlot::ENCODED_LEN
         );
+    }
+
+    fn nominated(holder: u8, nominee: u8) -> AuthoritySlot {
+        let mut slot = AuthoritySlot::initialize(AccountId::new([holder; 32])).unwrap();
+        slot.nominate(AccountId::new([nominee; 32]));
+        slot
+    }
+
+    #[test]
+    fn nominate_records_the_nominee_without_moving_the_holder() {
+        let slot = nominated(1, 2);
+        assert_eq!(slot.holder(), AccountId::new([1; 32]));
+        assert_eq!(slot.pending(), Some(AccountId::new([2; 32])));
+    }
+
+    #[test]
+    fn nominating_the_default_id_cancels() {
+        let mut slot = nominated(1, 2);
+        slot.nominate(AccountId::default());
+        assert_eq!(slot.pending(), None);
+    }
+
+    #[test]
+    fn a_later_nomination_replaces_an_earlier_one() {
+        let mut slot = nominated(1, 2);
+        slot.nominate(AccountId::new([3; 32]));
+        assert_eq!(slot.pending(), Some(AccountId::new([3; 32])));
+    }
+
+    #[test]
+    fn accept_moves_the_holder_and_clears_the_nomination() {
+        let mut slot = nominated(1, 2);
+        assert_eq!(slot.accept(&owned_acct(2, true)), Ok(()));
+        assert_eq!(slot.holder(), AccountId::new([2; 32]));
+        assert_eq!(slot.pending(), None);
+    }
+
+    #[test]
+    fn accept_without_a_nomination_is_refused() {
+        let mut slot = AuthoritySlot::initialize(AccountId::new([1; 32])).unwrap();
+        assert_eq!(
+            slot.accept(&owned_acct(2, true)),
+            Err(AuthorityError::NoNomination)
+        );
+    }
+
+    #[test]
+    fn accept_without_a_signature_is_refused() {
+        let mut slot = nominated(1, 2);
+        assert_eq!(
+            slot.accept(&owned_acct(2, false)),
+            Err(AuthorityError::MissingSignature)
+        );
+    }
+
+    #[test]
+    fn accept_by_someone_other_than_the_nominee_is_refused() {
+        let mut slot = nominated(1, 2);
+        assert_eq!(
+            slot.accept(&owned_acct(3, true)),
+            Err(AuthorityError::NotNominee)
+        );
+        assert_eq!(slot.holder(), AccountId::new([1; 32]));
+    }
+
+    #[test]
+    fn accept_by_an_unowned_nominee_is_refused() {
+        let mut slot = nominated(1, 2);
+        assert_eq!(
+            slot.accept(&acct(2, true)),
+            Err(AuthorityError::UnownedSigner)
+        );
+    }
+
+    #[test]
+    fn accept_fills_a_vacant_slot() {
+        let mut slot = nominated(1, 2);
+        slot.holder = AccountId::default();
+        assert_eq!(slot.accept(&owned_acct(2, true)), Ok(()));
+        assert_eq!(slot.holder(), AccountId::new([2; 32]));
+    }
+
+    #[test]
+    fn transfer_to_clears_the_nomination() {
+        let mut slot = nominated(1, 2);
+        slot.transfer_to(AccountId::new([3; 32])).unwrap();
+        assert_eq!(slot.pending(), None);
+        assert_eq!(
+            slot.accept(&owned_acct(2, true)),
+            Err(AuthorityError::NoNomination)
+        );
+    }
+
+    #[test]
+    fn renounce_clears_the_nomination() {
+        let mut slot = nominated(1, 2);
+        slot.renounce();
+        assert_eq!(slot.pending(), None);
     }
 }
