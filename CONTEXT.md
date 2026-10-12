@@ -9,15 +9,23 @@ Transfer-time claim describing an intended new holder. `Signer` claims the tx si
 _Avoid_: passing a bare `AccountId` for transfer (cannot validate key ownership or PDA existence)
 
 **AuthoritySlot**:
-Single-holder authority state — one private `holder: AccountId` field. Exposes `initialize` / `assert` / `transfer_to` / `renounce` / `is_renounced`. Carries no policy: it never decides who may call an operation, and never decides whether a renounce is recoverable.
+Single-holder authority state with at most one Nominee: two private `AccountId` fields, `holder` and the nomination. Exposes `initialize` / `assert` / `transfer_to` / `nominate` / `accept` / `renounce` / `is_renounced` / `pending`. Carries no policy: it never decides who may call an operation, and never decides whether a renounce is recoverable.
 _Avoid_: adding policy logic (who can transfer, terminal vs. recoverable renounce) to this crate — that belongs in the consuming library
+
+**Nomination**:
+A slot's handover in progress: the account named to become holder, stored until that account accepts. `AccountId::default()` means no nomination. Any change of holder clears it.
+_Avoid_: pending admin, candidate (a candidate is the one-step transfer claim)
+
+**Nominee**:
+The account a nomination names. It becomes holder only by signing accept itself, a PDA through a chained call from its owning program.
+_Avoid_: candidate, successor
 
 **Renounced sentinel**:
 `AccountId::default()` stored as `holder`, meaning "no current holder." `assert()` always fails with `Renounced` once set. Whether that's recoverable is entirely a consumer decision, not something `AuthoritySlot` enforces: admin-authority's `renounce()` is terminal because nothing in its API ever calls `transfer_to` again once `assert()` starts failing; freeze-authority's `transfer()` bypasses `slot.assert()` and gates on an admin check instead, so an admin can repopulate a renounced freeze slot via `transfer_to`.
 _See_: admin-authority CONTEXT.md (Renounce), freeze-authority CONTEXT.md (Renounce semantic, ADR-0007)
 
 **AuthorityError**:
-Flat error enum spanning both `AuthorityCandidate::validate()` failures (`InvalidCandidate`, `UndeployedPda`, `CandidateMismatch`) and `AuthoritySlot::assert()` failures (`Renounced`, `NotHolder`, `MissingSignature`). Deliberately kept as one enum rather than split per-function, so each downstream library needs exactly one `impl From<AuthorityError> for {Admin,Freeze}Error` mapping instead of two. Trade-off: `validate()` and `assert()` each only ever produce their own subset of variants, so their `Result` types are wider than strictly necessary.
+Flat error enum spanning `AuthorityCandidate::validate()` failures (`InvalidCandidate`, `UndeployedPda`, `CandidateMismatch`, `UnownedSigner`), `AuthoritySlot::assert()` failures (`Renounced`, `NotHolder`, `MissingSignature`) and `AuthoritySlot::accept()` failures (`NoNomination`, `NotNominee`, `MissingSignature`, `UnownedSigner`). Deliberately kept as one enum rather than split per-function, so each downstream library needs exactly one `impl From<AuthorityError> for {Admin,Freeze}Error` mapping instead of two. Trade-off: `validate()` and `assert()` each only ever produce their own subset of variants, so their `Result` types are wider than strictly necessary.
 
 **Policy-free**:
 This crate has no notion of "admin" or "freeze authority" — no instruction handlers, no error mapping to `SpelError`, no config PDA layout beyond the bare slot. Downstream libraries wrap `AuthoritySlot` in their own named config struct (`AdminConfig { slot }`, `FreezeConfig { slot, is_frozen }`) and expose their own semantically-named accessors (`admin()`, `freeze_authority()`).

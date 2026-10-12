@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](LICENSE-MIT)
 [![MSRV](https://img.shields.io/badge/MSRV-1.85-93450a?logo=rust)](Cargo.toml)
 
-Policy-free primitives for single-holder on-chain authority slots in SPEL libraries: `AuthorityCandidate` (validates a transfer-time claim against on-chain evidence) and `AuthoritySlot` (initialize / assert / transfer / renounce state for one holder).
+Policy-free primitives for single-holder on-chain authority slots in SPEL libraries: `AuthorityCandidate` (validates a transfer-time claim against on-chain evidence) and `AuthoritySlot` (initialize / assert / transfer / nominate / accept / renounce state for one holder and at most one nominee).
 
 This crate has no notion of "admin" or "freeze authority" — no instruction handlers, no policy on who can transfer or renounce. Downstream libraries (`admin-authority`, `freeze-authority`) compose these primitives into their own config types and layer their own policy on top.
 
@@ -50,7 +50,7 @@ impl AdminConfig {
 
 ## Versioning and stability
 
-Semantic versioning covers two surfaces: the crate's public Rust API, and `AuthoritySlot`'s 32-byte borsh encoding, which is an on-chain wire format that downstream config types embed. While the version is 0.x, a minor bump may change either, and each such change is called out in the changelog.
+Semantic versioning covers two surfaces: the crate's public Rust API, and `AuthoritySlot`'s 64-byte borsh encoding (holder, then nominee), which is an on-chain wire format that downstream config types embed. While the version is 0.x, a minor bump may change either, and each such change is called out in the changelog.
 
 The `spel-framework` dependency pins a fork revision for now. Version 1.0.0 lands when the extension mechanism reaches an upstream release ([logos-co/spel#257](https://github.com/logos-co/spel/pull/257)) and the pin moves to it.
 

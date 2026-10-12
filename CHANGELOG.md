@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `AuthoritySlot::nominate`, `accept` and `pending`.
+- `AuthorityError::NoNomination`, `NotNominee` and `UnownedSigner`.
+
+### Changed
+
+- Breaking: `AuthoritySlot` encodes as 64 bytes, holder at `0..32`, nominee at `32..64`. `ENCODED_LEN` is 64.
+- `transfer_to`, `accept` and `renounce` clear the nominee.
+- Breaking: `AuthorityCandidate::validate` refuses a `Signer` whose account no program owns.
+
 ## [0.1.2] - 2026-09-17
 
 ### Changed
