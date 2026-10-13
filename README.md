@@ -52,7 +52,7 @@ impl AdminConfig {
 
 Semantic versioning covers two surfaces: the crate's public Rust API, and `AuthoritySlot`'s 64-byte borsh encoding (holder, then nominee), which is an on-chain wire format that downstream config types embed. While the version is 0.x, a minor bump may change either, and each such change is called out in the changelog.
 
-The `spel-framework` dependency pins a fork revision for now. Version 1.0.0 lands when the extension mechanism reaches an upstream release ([logos-co/spel#257](https://github.com/logos-co/spel/pull/257)) and the pin moves to it.
+The `spel-framework` dependency pins the upstream `v0.7.0` tag. The crate stays at 0.x while SPEL does, since SPEL types are part of its public API.
 
 ## License
 

@@ -40,7 +40,7 @@ pub enum AuthorityError {
     Renounced,
     /// The signer's `is_authorized` flag is false.
     MissingSignature,
-    /// An embedded-slot window `[offset..offset+32)` does not fit inside
+    /// An embedded-slot window `[offset..offset+64)` does not fit inside
     /// the account's data. Layout error: the declared offset and the
     /// account's actual size disagree.
     SlotOutOfBounds,
