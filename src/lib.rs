@@ -1,11 +1,12 @@
 //! Reusable authority primitives for SPEL libraries.
 //!
 //! Provides [`AuthorityCandidate`] for validating a transfer-time claim
-//! against on-chain evidence, and [`AuthoritySlot`] as a single-holder
-//! authority state with initialize / assert / transfer / renounce
-//! semantics. Downstream libraries (`admin-authority`, `freeze-authority`)
-//! compose these into their own config types and expose lib-specific
-//! policy on top (who can transfer, who can renounce, etc).
+//! against on-chain evidence, and [`AuthoritySlot`] as authority state
+//! for one holder and at most one nominee, with initialize / assert /
+//! transfer / nominate / accept / renounce semantics. Downstream
+//! libraries (`admin-authority`, `freeze-authority`) compose these into
+//! their own config types and expose lib-specific policy on top (who
+//! can transfer, who can renounce, etc).
 //!
 //! This crate stays policy-free: no notion of "admin" or "freeze
 //! authority" lives here.
@@ -16,9 +17,9 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use spel_framework::prelude::*;
 
-/// Errors returned by [`AuthorityCandidate::validate`] and
-/// [`AuthoritySlot::assert`] / [`AuthoritySlot::initialize`]. Downstream
-/// error types typically wrap or map from this via `impl From`.
+/// Errors returned by [`AuthorityCandidate::validate`] and the
+/// [`AuthoritySlot`] methods. Downstream error types typically wrap or
+/// map from this via `impl From`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AuthorityError {
     /// A `Signer` candidate did not co-sign the transaction, OR
