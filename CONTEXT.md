@@ -21,7 +21,7 @@ The account a nomination names. It becomes holder only by signing accept itself,
 _Avoid_: candidate, successor
 
 **Renounced sentinel**:
-`AccountId::default()` stored as `holder`, meaning "no current holder." `assert()` always fails with `Renounced` once set. Whether that's recoverable is entirely a consumer decision, not something `AuthoritySlot` enforces: admin-authority's `renounce()` is terminal because nothing in its API ever calls `transfer_to` again once `assert()` starts failing; freeze-authority's `transfer()` bypasses `slot.assert()` and gates on an admin check instead, so an admin can repopulate a renounced freeze slot via `transfer_to`.
+`AccountId::default()` stored as `holder`, meaning "no current holder." `assert()` always fails with `Renounced` once set. Whether that's recoverable is entirely a consumer decision, not something `AuthoritySlot` enforces. admin-authority's renounce is terminal: it clears the nomination, `assert()` fails from then on so nothing can call `transfer_to` or nominate again, and its `accept` refuses a renounced slot. freeze-authority's `transfer()` bypasses `slot.assert()` and gates on an admin check instead, and the admin can also nominate a holder who then accepts, so a renounced freeze slot can be repopulated either way.
 _See_: admin-authority CONTEXT.md (Renounce), freeze-authority CONTEXT.md (Renounce semantic, ADR-0007)
 
 **AuthorityError**:
@@ -40,4 +40,4 @@ _Avoid_: adding any admin- or freeze-specific method here — that belongs in th
 ## Example dialogue
 
 > **Dev:** "Why doesn't `AuthoritySlot::renounce()` just make the slot permanently unusable?"
-> **Domain expert:** "Because that's a policy decision, and this crate doesn't make policy decisions. admin-authority makes renounce terminal by structuring its API so nothing can ever call `transfer_to` again once `assert()` starts failing. freeze-authority instead lets the admin recover a renounced slot, by routing `transfer()` through an admin check rather than `slot.assert()`. Same primitive, two different lifecycles, both valid."
+> **Domain expert:** "Because that's a policy decision, and this crate doesn't make policy decisions. admin-authority makes renounce terminal by structuring its API so nothing can call `transfer_to` or `accept` once `assert()` starts failing. freeze-authority instead lets the admin recover a renounced slot, by routing `transfer()` through an admin check rather than `slot.assert()`, and by letting the admin nominate a holder who then accepts. Same primitive, two different lifecycles, both valid."
